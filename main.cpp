@@ -134,7 +134,6 @@ Solution ClusterFirstRouteSecond(const Problem &prob)
         // have more than depot
         if (feasible_route.size() > 2)
         {
-            feasible_route.insert(feasible_route.begin(), 0);
             sln.routes.push_back(feasible_route);
         }
 
@@ -230,7 +229,7 @@ bool AccuracyCheck(const Problem &prb, const Solution &sln)
     // sanity check
     if (sln.routes.size() == 0)
     {
-        std::cout << "!!!NO ROUTES!!!" << std::endl;
+        //std::cout << "!!!NO ROUTES!!!" << std::endl;
         return false;
     }
 
@@ -247,7 +246,7 @@ bool AccuracyCheck(const Problem &prb, const Solution &sln)
         }
         if (tmp_cap > prb.capacity)
         {
-            std::cout << "!!!OUT OF CAPACITY!!!" << std::endl;
+            //std::cout << "!!!OUT OF CAPACITY!!!" << std::endl;
             return false;
         }
         tmp_cap = 0;
@@ -257,7 +256,7 @@ bool AccuracyCheck(const Problem &prb, const Solution &sln)
     for (int i = 1; i < visited.size(); ++i)
         if (visited[i] != 1)
         {
-            std::cout << "!!!VISITING PROBLEM!!!" << std::endl;
+            //std::cout << "!!!VISITING PROBLEM!!!" << std::endl;
             return false;
         }
 
@@ -274,7 +273,7 @@ bool AccuracyCheck(const Problem &prb, const Solution &sln)
             time_ = std::max(time_ + (int)std::round(prb.cost[prev][curr]) + prb.times[prev].service, prb.times[curr].begin);
             if (time_ > prb.times[curr].end)
             {
-                std::cout << "!!!BAD TIMING - TOO LATE!!!" << std::endl;
+                //std::cout << "!!!BAD TIMING - TOO LATE!!!" << std::endl;
                 return false;
             }
         }
@@ -284,7 +283,7 @@ bool AccuracyCheck(const Problem &prb, const Solution &sln)
     // check vehicles
     if (sln.routes.size() > prb.n_vehicle)
     {
-        std::cout << "!!!OUT OF VEHICLES!!!" << std::endl;
+        //std::cout << "!!!OUT OF VEHICLES!!!" << std::endl;
         return false;
     }
 
@@ -356,17 +355,86 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
 {
     Solution new_sol(sln);
 
-    // 1-opt
-    for (int i = 0; i < sln.routes.size(); ++i)
-    {
-        for (int j = 1; j < sln.routes[i].size(); ++j)
-        {
-        }
-    }
-
     // 2-opt
+    for (auto &route : sln.routes)
+        for (int i = 1; i < route.size() - 1; ++i)
+            for (int j = 1; j < route.size() - 1; ++j)
+                if (j != i)
+                {
+                    Solution tmp_sol(new_sol);
+                    std::vector<size_t> new_route = route;
+                    std::swap(new_route[j], new_route[i]);
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), route, new_route);
 
-    return AccuracyCheck(prb, new_sol) ? new_sol : sln;
+                    if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol)))
+                    {
+                        //std::cout << "better obj " << CalcObjective(prb, tmp_sol) << std::endl;
+                        new_sol = tmp_sol;
+                    }
+                }
+
+    std::cout << "After 2-ort " << CalcObjective(prb, new_sol) << std::endl;
+
+    // relocate right
+    Solution new_sol2(new_sol);
+    for (int r = 0; r < new_sol.routes.size() - 1; ++r)
+        for (int i = 1; i < new_sol.routes[r].size() - 1; ++i)         // remove
+            for (int j = 1; j < new_sol.routes[r + 1].size() - 2; ++j) //add
+            {
+                Solution tmp_sol(new_sol2);
+                std::vector<size_t> new_route_r1 = new_sol.routes[r];
+                std::vector<size_t> new_route_r2 = new_sol.routes[r + 1];
+                new_route_r1.erase(std::remove(new_route_r1.begin(),
+                                               new_route_r1.end(), new_sol.routes[r][i]),
+                                   new_route_r1.end());
+
+                new_route_r2.insert(new_route_r2.begin() + j, new_sol.routes[r][i]);
+
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol.routes[r], new_route_r1);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol.routes[r + 1], new_route_r2);
+
+                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol2)))
+                {
+                    //std::cout << "better obj " << CalcObjective(prb, tmp_sol) << std::endl;
+                    new_sol2 = tmp_sol;
+                }
+            }
+
+    std::cout << "After relocate right " << CalcObjective(prb, new_sol2) << std::endl;
+
+    // relocate left
+    Solution new_sol3(new_sol2);
+    for (int r = 1; r < new_sol2.routes.size(); ++r)
+        for (int i = 1; i < new_sol2.routes[r].size() - 1; ++i)         // remove
+            for (int j = 1; j < new_sol2.routes[r - 1].size() - 2; ++j) //add
+            {
+                Solution tmp_sol(new_sol3);
+                std::vector<size_t> new_route_r1 = new_sol2.routes[r];
+                std::vector<size_t> new_route_r2 = new_sol2.routes[r - 1];
+                new_route_r1.erase(std::remove(new_route_r1.begin(),
+                                               new_route_r1.end(), new_sol2.routes[r][i]),
+                                   new_route_r1.end());
+
+                new_route_r2.insert(new_route_r2.begin() + j, new_sol.routes[r][i]);
+
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol2.routes[r], new_route_r1);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol2.routes[r - 1], new_route_r2);
+
+                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol3)))
+                {
+                    //std::cout << "better obj " << CalcObjective(prb, tmp_sol) << std::endl;
+                    new_sol3 = tmp_sol;
+                }
+            }
+
+    std::cout << "After relocate left " << CalcObjective(prb, new_sol3) << std::endl;
+
+    // exchange
+    /*Solution new_sol4(new_sol3);
+
+    std::cout << "After exchange " << CalcObjective(prb, new_sol4) << std::endl;*/
+
+    return new_sol3;
 }
 
 int main()
@@ -393,15 +461,13 @@ int main()
             std::cout << " OBJECTIVE = " << CalcObjective(prb, sln) << std::endl;
 
         // run local search to improve solution
-        /* Solution improved_sln = sln;
-        for (int i = 0; i < 10; ++i)
-        {
-            improved_sln = LocalSearch(prb, improved_sln);
-            if (!AccuracyCheck(prb, improved_sln))
-                std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
-            else
-                std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
-        }*/
+        Solution improved_sln = sln;
+
+        improved_sln = LocalSearch(prb, improved_sln);
+        if (!AccuracyCheck(prb, improved_sln))
+            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+        else
+            std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
 
         std::cout << std::endl;
     }
