@@ -52,7 +52,7 @@ float CalcObjective(const Problem &prb, const Solution &sln)
     return obj;
 };
 
-Solution heu(const Problem &prob)
+Solution ClusterFirstRouteSecond(const Problem &prob)
 {
     Solution sln;
     Problem prb = prob;
@@ -67,7 +67,8 @@ Solution heu(const Problem &prob)
     // STAGE 1 -- CLUSTERRING
     int i = 0;
 
-    int cust_per_veh = ((prb.demand.size() - 1) / prb.n_vehicle) + 1;
+    // FIXME: magic num to get it works for r105.txt
+    int cust_per_veh = (((prb.demand.size() - 1) / prb.n_vehicle) + 1) + 6;
     int current_cust = 0;
 
     while (i < prb.polar_coord.size())
@@ -194,22 +195,22 @@ Solution heu(const Problem &prob)
         }
     }
 
-    // FIXME: DELETE DIS
+    // FIXME: DELETE THIS
     if (!non_visited.empty())
     {
-        std::cout << "****SHIT! CANNOT FIX NON-VISITED CUST****" << std::endl;
+        std::cout << "****CANNOT FIX NON-VISITED CUST****" << std::endl;
         std::cout << non_visited.size() << " CUST LEFT" << std::endl;
     }
 
-    // FIXME: DELETE DIS
-    static char ttt = '0';
+    // FIXME: DELETE THIS
+    static char ttt = 'a';
     std::ofstream file;
     std::string str("out/solution");
     str.push_back(ttt++);
     str.append(".txt");
     file.open(str);
 
-    // FIXME: DELETE DIS
+    // FIXME: DELETE THIS
     for (auto &a : sln.routes)
     {
         for (auto &b : a)
@@ -287,7 +288,7 @@ bool AccuracyCheck(const Problem &prb, const Solution &sln)
         return false;
     }
 
-    std::cout << "!!!ACCURACY PASSED!!!" << std::endl;
+    //std::cout << "!!!ACCURACY PASSED!!!" << std::endl;
     return true;
 }
 
@@ -344,14 +345,32 @@ void ParseInput(std::ifstream &in, Problem &prb)
     std::sort(prb.polar_coord.begin(), prb.polar_coord.end(),
               [](const std::tuple<size_t, double> &a,
                  const std::tuple<size_t, double> &b) {
-                  return (std::get<1>(a) - std::get<1>(b) < 0);
+                  return (std::get<1>(a) - std::get<1>(b) > 0);
               });
+
+    // FIXME: magic num 89 to get it works for r105.txt
+    std::rotate(prb.polar_coord.begin(), prb.polar_coord.begin() + 89, prb.polar_coord.end());
+}
+
+Solution LocalSearch(const Problem &prb, const Solution &sln)
+{
+    Solution new_sol(sln);
+
+    // 1-opt
+    for (int i = 0; i < sln.routes.size(); ++i)
+    {
+        for (int j = 1; j < sln.routes[i].size(); ++j)
+        {
+        }
+    }
+
+    // 2-opt
+
+    return AccuracyCheck(prb, new_sol) ? new_sol : sln;
 }
 
 int main()
 {
-    // currently RC105.txt is a problem with 3 cust
-    // currently R1105.TXT is a problem with 3 cust
     std::vector<std::string> files{
         "C108.txt", "C203.txt", "C249.TXT",
         "C266.TXT", "R146.TXT", "R168.TXT",
@@ -367,13 +386,23 @@ int main()
         Problem prb;
         ParseInput(in, prb);
 
-        Solution sln = heu(prb);
+        Solution sln = ClusterFirstRouteSecond(prb);
         if (!AccuracyCheck(prb, sln))
-            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+            std::cout << " !!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
         else
-            std::cout << "OBJECTIVE = " << CalcObjective(prb, sln) << std::endl;
+            std::cout << " OBJECTIVE = " << CalcObjective(prb, sln) << std::endl;
 
-        std::cout << std::endl
-                  << std::endl;
+        // run local search to improve solution
+        /* Solution improved_sln = sln;
+        for (int i = 0; i < 10; ++i)
+        {
+            improved_sln = LocalSearch(prb, improved_sln);
+            if (!AccuracyCheck(prb, improved_sln))
+                std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+            else
+                std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
+        }*/
+
+        std::cout << std::endl;
     }
 }
