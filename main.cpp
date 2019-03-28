@@ -527,7 +527,7 @@ Solution GuidedWithPen(Problem &modif_prob, const Solution &new_sol,
     return LocalSearch(modif_prob, new_sol);
 }
 
-Solution GuidedLocalSearch(const Problem &prb, const Solution &sln)
+Solution GuidedLocalSearch(const Problem &prb, const Solution &sln, const float &lambda)
 {
     Problem modif_prob = prb;
 
@@ -540,13 +540,8 @@ Solution GuidedLocalSearch(const Problem &prb, const Solution &sln)
 
     int i = 0;
     const int stop = 10;
-    // 0.03 for C108 C203
-    // 0.01 for C249 R202 RC105 RC207
-    // 0.006 for C266
-    // 0.0005 for R168 RC148
-    // 0.00005 for R146
-    const float lambda = 0.00005;
-    while (i++ < stop)
+
+    while (true)
     {
         Solution new_sln = GuidedWithPen(modif_prob, curr_best_sol, prev_best_sol, pens, lambda);
 
@@ -555,6 +550,10 @@ Solution GuidedLocalSearch(const Problem &prb, const Solution &sln)
             std::cout << "GUIDED IMPROVED " << CalcObjective(prb, new_sln) << std::endl;
             prev_best_sol = curr_best_sol;
             curr_best_sol = new_sln;
+        }
+        else
+        {
+            break;
         }
     }
 
@@ -566,13 +565,20 @@ Solution GuidedLocalSearch(const Problem &prb, const Solution &sln)
 int main()
 {
     std::vector<std::string> files{
-        /*"C108.txt", "C203.txt", "C249.TXT",
+        "C108.txt", "C203.txt", "C249.TXT",
         "C266.TXT", "R146.TXT", "R168.TXT",
         "R202.txt", "RC105.txt", "RC148.TXT",
-        "RC207.txt",*/
-        "R1103.TXT", "R1104.TXT",
+        "RC207.txt", "R1103.TXT", "R1104.TXT",
         "R1105.TXT", "R1107.TXT", "R11010.TXT"};
 
+    // more magic numbers
+    std::vector<float> lambdas{0.03, 0.03, 0.01,
+                               0.006, 0.00005, 0.0005,
+                               0.01, 0.01, 0.0005,
+                               0.01, 0.00001, 0.00001,
+                               0.00001, 0.00001, 0.000007};
+
+    int i = 0; //index for lambda
     for (auto &file_name : files)
     {
         std::cout << "Case " << file_name << std::endl;
@@ -595,9 +601,7 @@ int main()
         else
             std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
 
-        //FIXME: remove after fix vectors invalidation in local search
-        int i = 0, max_iter = 10;
-        while (/*(i++ < max_iter) &&*/ AccuracyCheck(prb, improved_sln) &&
+        while (AccuracyCheck(prb, improved_sln) &&
                CalcObjective(prb, improved_sln) < CalcObjective(prb, prev_stage_sln))
         {
             prev_stage_sln = improved_sln;
@@ -608,7 +612,15 @@ int main()
                 std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
         }
 
-        if (AccuracyCheck(prb, improved_sln))
+        // run guided local search
+        Solution gls_sln = GuidedLocalSearch(prb, sln, lambdas[i++]);
+        if (!AccuracyCheck(prb, gls_sln))
+            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+        else
+            std::cout << "Guided Local Search IMPROVED OBJECTIVE = " << CalcObjective(prb, gls_sln) << std::endl;
+
+        auto best_sln = CalcObjective(prb, gls_sln) < CalcObjective(prb, improved_sln) ? gls_sln : improved_sln;
+        if (AccuracyCheck(prb, best_sln))
         {
             // FIXME: DELETE THIS
             static char ttt = 'a';
@@ -618,10 +630,10 @@ int main()
             str.append(".txt");
             file.open(str);
             file << file_name << std::endl
-                 << CalcObjective(prb, improved_sln) << std::endl;
+                 << CalcObjective(prb, best_sln) << std::endl;
 
             // FIXME: DELETE THIS
-            for (auto &a : improved_sln.routes)
+            for (auto &a : best_sln.routes)
             {
                 if (a.size() > 2)
                 {
@@ -634,12 +646,6 @@ int main()
             }
             file.close();
         }
-
-        Solution gls_sln = GuidedLocalSearch(prb, sln);
-        if (!AccuracyCheck(prb, gls_sln))
-            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
-        else
-            std::cout << "Guided Local Search IMPROVED OBJECTIVE = " << CalcObjective(prb, gls_sln) << std::endl;
 
         std::cout << std::endl;
     }
