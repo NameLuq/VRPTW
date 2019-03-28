@@ -354,7 +354,7 @@ void ParseInput(std::ifstream &in, Problem &prb)
 //FIXME: fix vectors invalidation in local search
 Solution LocalSearch(const Problem &prb, const Solution &sln)
 {
-    Solution new_sol(sln);
+    Solution sol_2_opt(sln);
 
     // 2-opt
     for (int r = 0; r < sln.routes.size(); ++r)
@@ -362,13 +362,13 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
             for (int j = 1; j < sln.routes[r].size() - 1; ++j)
                 if (j != i)
                 {
-                    Solution tmp_sol(new_sol);
-                    std::vector<size_t> new_route = new_sol.routes[r];
+                    Solution tmp_sol(sol_2_opt);
+                    std::vector<size_t> new_route = sol_2_opt.routes[r];
                     std::swap(new_route[j], new_route[i]);
-                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol.routes[r], new_route);
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), sol_2_opt.routes[r], new_route);
 
-                    if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol)))
-                        new_sol = tmp_sol;
+                    if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, sol_2_opt)))
+                        sol_2_opt = tmp_sol;
                 }
 
     // relocate
@@ -377,17 +377,17 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
     int r3_size = 0;
     int i = 1, j = 1, k = 1;
 
-    Solution new_sol2(new_sol);
+    Solution sol_reloc(sln);
 
-    for (int r = 1; r < new_sol.routes.size() - 1; ++r)
+    for (int r = 1; r < sln.routes.size() - 1; ++r)
     {
-        r1_size = new_sol2.routes[r].size() - 1;
+        r1_size = sol_reloc.routes[r].size() - 1;
         while (i < r1_size)
         {
-            r3_size = new_sol2.routes[r - 1].size() - 1;
+            r3_size = sol_reloc.routes[r - 1].size() - 1;
             while (k < r3_size)
             {
-                Solution tmp_sol(new_sol2);
+                Solution tmp_sol(sol_reloc);
                 std::vector<size_t> new_route_r1 = tmp_sol.routes[r];
                 std::vector<size_t> new_route_r2 = tmp_sol.routes[r - 1];
 
@@ -399,9 +399,9 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
                 std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_route_r1);
                 std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r - 1], new_route_r2);
 
-                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol2)))
+                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, sol_reloc)))
                 {
-                    new_sol2 = tmp_sol;
+                    sol_reloc = tmp_sol;
 
                     --r1_size;
                     if (i == r1_size)
@@ -414,10 +414,10 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
             if (i == r1_size)
                 break;
 
-            r2_size = new_sol2.routes[r + 1].size() - 1;
+            r2_size = sol_reloc.routes[r + 1].size() - 1;
             while (j < r2_size)
             {
-                Solution tmp_sol(new_sol2);
+                Solution tmp_sol(sol_reloc);
                 std::vector<size_t> new_route_r1 = tmp_sol.routes[r];
                 std::vector<size_t> new_route_r2 = tmp_sol.routes[r + 1];
 
@@ -429,9 +429,9 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
                 std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_route_r1);
                 std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r + 1], new_route_r2);
 
-                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol2)))
+                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, sol_reloc)))
                 {
-                    new_sol2 = tmp_sol;
+                    sol_reloc = tmp_sol;
                     --r1_size;
                     if (i == r1_size)
                         break;
@@ -452,18 +452,18 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
 
     i = j = 1;
 
-    Solution new_sol3(new_sol2);
-    for (int r = 0; r < new_sol2.routes.size() - 1; ++r)
+    Solution sol_exch(sln);
+    for (int r = 0; r < sln.routes.size() - 1; ++r)
     {
-        r1_size = new_sol2.routes[r].size() - 1;
+        r1_size = sol_exch.routes[r].size() - 1;
 
         while (i < r1_size)
         {
-            r2_size = new_sol2.routes[r + 1].size() - 1;
+            r2_size = sol_exch.routes[r + 1].size() - 1;
 
             while (j < r2_size)
             {
-                Solution tmp_sol(new_sol3);
+                Solution tmp_sol(sol_exch);
                 int cust_r1 = tmp_sol.routes[r][i];
                 int cust_r2 = tmp_sol.routes[r + 1][j];
 
@@ -476,9 +476,9 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
                 std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_r1);
                 std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r + 1], new_r2);
 
-                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol3)))
+                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, sol_exch)))
                 {
-                    new_sol3 = tmp_sol;
+                    sol_exch = tmp_sol;
                 }
                 ++j;
             }
@@ -488,22 +488,95 @@ Solution LocalSearch(const Problem &prb, const Solution &sln)
         i = 1;
     }
 
-    return new_sol3;
+    auto best_obj = std::min({CalcObjective(prb, sln), CalcObjective(prb, sol_2_opt),
+                              CalcObjective(prb, sol_reloc), CalcObjective(prb, sol_exch)});
+
+    if (best_obj == CalcObjective(prb, sol_2_opt))
+        return sol_2_opt;
+    if (best_obj == CalcObjective(prb, sol_reloc))
+        return sol_reloc;
+    if (best_obj == CalcObjective(prb, sol_exch))
+        return sol_exch;
+
+    return sln;
+}
+
+void SetSolutionDifference(Problem &prb, const Solution &sln1,
+                           const Solution &sln2, std::vector<std::vector<size_t>> &pens,
+                           const float &lambda)
+{
+    for (int i = 0; i < sln1.routes.size(); ++i)
+        for (int j = 1; j < sln1.routes[i].size() - 1; ++j)
+        {
+            auto prev = sln1.routes[i][j - 1];
+            auto curr = sln1.routes[i][j];
+            if (j < sln2.routes[i].size() && prev == sln2.routes[i][j - 1] &&
+                curr == sln2.routes[i][j])
+            {
+                ++pens[prev][curr];
+                prb.cost[prev][curr] += prb.cost[prev][curr] * lambda;
+            }
+        }
+}
+
+Solution GuidedWithPen(Problem &modif_prob, const Solution &new_sol,
+                       const Solution &curr_sol, std::vector<std::vector<size_t>> &pens,
+                       const float &lambda)
+{
+    SetSolutionDifference(modif_prob, new_sol, curr_sol, pens, lambda);
+    return LocalSearch(modif_prob, new_sol);
+}
+
+Solution GuidedLocalSearch(const Problem &prb, const Solution &sln)
+{
+    Problem modif_prob = prb;
+
+    Solution prev_best_sol = sln;
+    Solution curr_best_sol = LocalSearch(prb, sln);
+
+    // set penalty matrix for each arc
+    std::vector<size_t> tmp(prb.cost.size(), 0);
+    std::vector<std::vector<size_t>> pens(prb.cost.size(), tmp);
+
+    int i = 0;
+    const int stop = 10;
+    // 0.03 for C108 C203
+    // 0.01 for C249 R202 RC105 RC207
+    // 0.006 for C266
+    // 0.0005 for R168 RC148
+    // 0.00005 for R146
+    const float lambda = 0.00005;
+    while (i++ < stop)
+    {
+        Solution new_sln = GuidedWithPen(modif_prob, curr_best_sol, prev_best_sol, pens, lambda);
+
+        if (CalcObjective(prb, new_sln) - CalcObjective(prb, curr_best_sol) < 0)
+        {
+            std::cout << "GUIDED IMPROVED " << CalcObjective(prb, new_sln) << std::endl;
+            prev_best_sol = curr_best_sol;
+            curr_best_sol = new_sln;
+        }
+    }
+
+    curr_best_sol = LocalSearch(prb, curr_best_sol);
+
+    return curr_best_sol;
 }
 
 int main()
 {
     std::vector<std::string> files{
-        "C108.txt", "C203.txt", "C249.TXT",
+        /*"C108.txt", "C203.txt", "C249.TXT",
         "C266.TXT", "R146.TXT", "R168.TXT",
         "R202.txt", "RC105.txt", "RC148.TXT",
-        "RC207.txt", "R1103.TXT", "R1104.TXT",
+        "RC207.txt",*/
+        "R1103.TXT", "R1104.TXT",
         "R1105.TXT", "R1107.TXT", "R11010.TXT"};
 
-    for (auto &file : files)
+    for (auto &file_name : files)
     {
-        std::cout << "Case " << file << std::endl;
-        std::ifstream in(file);
+        std::cout << "Case " << file_name << std::endl;
+        std::ifstream in(file_name);
 
         Problem prb;
         ParseInput(in, prb);
@@ -515,17 +588,58 @@ int main()
             std::cout << " OBJECTIVE = " << CalcObjective(prb, sln) << std::endl;
 
         // run local search to improve solution
-        Solution improved_sln = sln;
+        Solution prev_stage_sln = sln;
+        Solution improved_sln = LocalSearch(prb, prev_stage_sln);
+        if (!AccuracyCheck(prb, improved_sln))
+            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+        else
+            std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
 
         //FIXME: remove after fix vectors invalidation in local search
-        for (int i = 0; i < 5; ++i)
+        int i = 0, max_iter = 10;
+        while (/*(i++ < max_iter) &&*/ AccuracyCheck(prb, improved_sln) &&
+               CalcObjective(prb, improved_sln) < CalcObjective(prb, prev_stage_sln))
         {
+            prev_stage_sln = improved_sln;
             improved_sln = LocalSearch(prb, improved_sln);
             if (!AccuracyCheck(prb, improved_sln))
                 std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
             else
                 std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
         }
+
+        if (AccuracyCheck(prb, improved_sln))
+        {
+            // FIXME: DELETE THIS
+            static char ttt = 'a';
+            std::ofstream file;
+            std::string str("out/solution_");
+            str.push_back(ttt++);
+            str.append(".txt");
+            file.open(str);
+            file << file_name << std::endl
+                 << CalcObjective(prb, improved_sln) << std::endl;
+
+            // FIXME: DELETE THIS
+            for (auto &a : improved_sln.routes)
+            {
+                if (a.size() > 2)
+                {
+                    for (auto &b : a)
+                    {
+                        file << b << ' ';
+                    }
+                    file << std::endl;
+                }
+            }
+            file.close();
+        }
+
+        Solution gls_sln = GuidedLocalSearch(prb, sln);
+        if (!AccuracyCheck(prb, gls_sln))
+            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+        else
+            std::cout << "Guided Local Search IMPROVED OBJECTIVE = " << CalcObjective(prb, gls_sln) << std::endl;
 
         std::cout << std::endl;
     }
