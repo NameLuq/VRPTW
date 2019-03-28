@@ -201,7 +201,7 @@ Solution ClusterFirstRouteSecond(const Problem &prob)
         std::cout << non_visited.size() << " CUST LEFT" << std::endl;
     }
 
-    // FIXME: DELETE THIS
+    /*// FIXME: DELETE THIS
     static char ttt = 'a';
     std::ofstream file;
     std::string str("out/solution");
@@ -217,7 +217,7 @@ Solution ClusterFirstRouteSecond(const Problem &prob)
             file << b << ' ';
         }
         file << std::endl;
-    }
+    }*/
 
     sln.times = prb.times;
 
@@ -351,88 +351,142 @@ void ParseInput(std::ifstream &in, Problem &prb)
     std::rotate(prb.polar_coord.begin(), prb.polar_coord.begin() + 89, prb.polar_coord.end());
 }
 
+//FIXME: fix vectors invalidation in local search
 Solution LocalSearch(const Problem &prb, const Solution &sln)
 {
     Solution new_sol(sln);
 
     // 2-opt
-    for (auto &route : sln.routes)
-        for (int i = 1; i < route.size() - 1; ++i)
-            for (int j = 1; j < route.size() - 1; ++j)
+    for (int r = 0; r < sln.routes.size(); ++r)
+        for (int i = 1; i < sln.routes[r].size() - 1; ++i)
+            for (int j = 1; j < sln.routes[r].size() - 1; ++j)
                 if (j != i)
                 {
                     Solution tmp_sol(new_sol);
-                    std::vector<size_t> new_route = route;
+                    std::vector<size_t> new_route = new_sol.routes[r];
                     std::swap(new_route[j], new_route[i]);
-                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), route, new_route);
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol.routes[r], new_route);
 
                     if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol)))
-                    {
-                        //std::cout << "better obj " << CalcObjective(prb, tmp_sol) << std::endl;
                         new_sol = tmp_sol;
-                    }
                 }
 
-    std::cout << "After 2-ort " << CalcObjective(prb, new_sol) << std::endl;
+    // relocate
+    int r1_size = 0;
+    int r2_size = 0;
+    int r3_size = 0;
+    int i = 1, j = 1, k = 1;
 
-    // relocate right
     Solution new_sol2(new_sol);
-    for (int r = 0; r < new_sol.routes.size() - 1; ++r)
-        for (int i = 1; i < new_sol.routes[r].size() - 1; ++i)         // remove
-            for (int j = 1; j < new_sol.routes[r + 1].size() - 2; ++j) //add
+
+    for (int r = 1; r < new_sol.routes.size() - 1; ++r)
+    {
+        r1_size = new_sol2.routes[r].size() - 1;
+        while (i < r1_size)
+        {
+            r3_size = new_sol2.routes[r - 1].size() - 1;
+            while (k < r3_size)
             {
                 Solution tmp_sol(new_sol2);
-                std::vector<size_t> new_route_r1 = new_sol.routes[r];
-                std::vector<size_t> new_route_r2 = new_sol.routes[r + 1];
+                std::vector<size_t> new_route_r1 = tmp_sol.routes[r];
+                std::vector<size_t> new_route_r2 = tmp_sol.routes[r - 1];
+
+                new_route_r2.insert(new_route_r2.begin() + k, new_route_r1[i]);
                 new_route_r1.erase(std::remove(new_route_r1.begin(),
-                                               new_route_r1.end(), new_sol.routes[r][i]),
+                                               new_route_r1.end(), new_route_r1[i]),
                                    new_route_r1.end());
 
-                new_route_r2.insert(new_route_r2.begin() + j, new_sol.routes[r][i]);
-
-                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol.routes[r], new_route_r1);
-                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol.routes[r + 1], new_route_r2);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_route_r1);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r - 1], new_route_r2);
 
                 if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol2)))
                 {
-                    //std::cout << "better obj " << CalcObjective(prb, tmp_sol) << std::endl;
                     new_sol2 = tmp_sol;
+
+                    --r1_size;
+                    if (i == r1_size)
+                        break;
+                    ++r3_size;
                 }
+                ++k;
             }
 
-    std::cout << "After relocate right " << CalcObjective(prb, new_sol2) << std::endl;
+            if (i == r1_size)
+                break;
 
-    // relocate left
-    Solution new_sol3(new_sol2);
-    for (int r = 1; r < new_sol2.routes.size(); ++r)
-        for (int i = 1; i < new_sol2.routes[r].size() - 1; ++i)         // remove
-            for (int j = 1; j < new_sol2.routes[r - 1].size() - 2; ++j) //add
+            r2_size = new_sol2.routes[r + 1].size() - 1;
+            while (j < r2_size)
             {
-                Solution tmp_sol(new_sol3);
-                std::vector<size_t> new_route_r1 = new_sol2.routes[r];
-                std::vector<size_t> new_route_r2 = new_sol2.routes[r - 1];
+                Solution tmp_sol(new_sol2);
+                std::vector<size_t> new_route_r1 = tmp_sol.routes[r];
+                std::vector<size_t> new_route_r2 = tmp_sol.routes[r + 1];
+
+                new_route_r2.insert(new_route_r2.begin() + j, new_route_r1[i]);
                 new_route_r1.erase(std::remove(new_route_r1.begin(),
-                                               new_route_r1.end(), new_sol2.routes[r][i]),
+                                               new_route_r1.end(), new_route_r1[i]),
                                    new_route_r1.end());
 
-                new_route_r2.insert(new_route_r2.begin() + j, new_sol.routes[r][i]);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_route_r1);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r + 1], new_route_r2);
 
-                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol2.routes[r], new_route_r1);
-                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), new_sol2.routes[r - 1], new_route_r2);
+                if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol2)))
+                {
+                    new_sol2 = tmp_sol;
+                    --r1_size;
+                    if (i == r1_size)
+                        break;
+                    ++r2_size;
+                }
+                ++j;
+            }
+            ++i;
+            j = 1;
+            k = 1;
+        }
+        i = 1;
+    }
+
+    // exchange
+    r1_size = 0;
+    r2_size = 0;
+
+    i = j = 1;
+
+    Solution new_sol3(new_sol2);
+    for (int r = 0; r < new_sol2.routes.size() - 1; ++r)
+    {
+        r1_size = new_sol2.routes[r].size() - 1;
+
+        while (i < r1_size)
+        {
+            r2_size = new_sol2.routes[r + 1].size() - 1;
+
+            while (j < r2_size)
+            {
+                Solution tmp_sol(new_sol3);
+                int cust_r1 = tmp_sol.routes[r][i];
+                int cust_r2 = tmp_sol.routes[r + 1][j];
+
+                std::vector<size_t> new_r1 = tmp_sol.routes[r];
+                std::vector<size_t> new_r2 = tmp_sol.routes[r + 1];
+
+                std::replace(new_r1.begin(), new_r1.end(), cust_r1, cust_r2);
+                std::replace(new_r2.begin(), new_r2.end(), cust_r2, cust_r1);
+
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_r1);
+                std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r + 1], new_r2);
 
                 if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, new_sol3)))
                 {
-                    //std::cout << "better obj " << CalcObjective(prb, tmp_sol) << std::endl;
                     new_sol3 = tmp_sol;
                 }
+                ++j;
             }
-
-    std::cout << "After relocate left " << CalcObjective(prb, new_sol3) << std::endl;
-
-    // exchange
-    /*Solution new_sol4(new_sol3);
-
-    std::cout << "After exchange " << CalcObjective(prb, new_sol4) << std::endl;*/
+            ++i;
+            j = 1;
+        }
+        i = 1;
+    }
 
     return new_sol3;
 }
@@ -463,11 +517,15 @@ int main()
         // run local search to improve solution
         Solution improved_sln = sln;
 
-        improved_sln = LocalSearch(prb, improved_sln);
-        if (!AccuracyCheck(prb, improved_sln))
-            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
-        else
-            std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
+        //FIXME: remove after fix vectors invalidation in local search
+        for (int i = 0; i < 5; ++i)
+        {
+            improved_sln = LocalSearch(prb, improved_sln);
+            if (!AccuracyCheck(prb, improved_sln))
+                std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+            else
+                std::cout << "IMPROVED OBJECTIVE = " << CalcObjective(prb, improved_sln) << std::endl;
+        }
 
         std::cout << std::endl;
     }
