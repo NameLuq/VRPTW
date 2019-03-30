@@ -349,9 +349,23 @@ void ParseInput(std::ifstream &in, Problem &prb)
 
     // FIXME: magic num 89 to get it works for r105.txt
     std::rotate(prb.polar_coord.begin(), prb.polar_coord.begin() + 89, prb.polar_coord.end());
+
+    /*// FIXME: DELETE THIS
+    static char ttt = 'a';
+    std::ofstream file;
+    std::string str("out/problem_");
+    str.push_back(ttt++);
+    str.append(".txt");
+    file.open(str);
+    int q = 0;
+    // FIXME: DELETE THIS
+    for (auto &a : xy)
+    {
+        file << q++ << ' ' << ' ' << a.first << ' ' << a.second << std::endl;
+    }
+    file.close();*/
 }
 
-//FIXME: fix vectors invalidation in local search
 Solution LocalSearch(const Problem &prb, const Solution &sln)
 {
     Solution sol_2_opt(sln);
@@ -557,9 +571,209 @@ Solution GuidedLocalSearch(const Problem &prb, const Solution &sln, const float 
         }
     }
 
-    curr_best_sol = LocalSearch(prb, curr_best_sol);
+    while (AccuracyCheck(prb, curr_best_sol) && CalcObjective(prb, curr_best_sol) - CalcObjective(prb, prev_best_sol) < 0)
+    {
+        prev_best_sol = curr_best_sol;
+        curr_best_sol = LocalSearch(prb, curr_best_sol);
+    }
 
     return curr_best_sol;
+}
+
+Solution Perturbation(const Problem &prb, const Solution &sln, const int pert_power)
+{
+    Solution pert_sln(sln);
+
+    std::srand(time(0));
+    // 2-opt
+    for (int r = 0; r < sln.routes.size(); ++r)
+        for (int i = 1; i < sln.routes[r].size() - 1; ++i)
+            for (int j = 1; j < sln.routes[r].size() - 1; ++j)
+                if (j != i)
+                {
+                    if (rand() % pert_power == 1)
+                    {
+                        Solution tmp_sol(pert_sln);
+                        std::vector<size_t> new_route = pert_sln.routes[r];
+                        std::swap(new_route[j], new_route[i]);
+                        std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), pert_sln.routes[r], new_route);
+
+                        if (AccuracyCheck(prb, tmp_sol))
+                            pert_sln = tmp_sol;
+                    }
+                }
+
+    // relocate
+    int r1_size = 0;
+    int r2_size = 0;
+    int r3_size = 0;
+    int i = 1, j = 1, k = 1;
+
+    for (int r = 1; r < sln.routes.size() - 1; ++r)
+    {
+        r1_size = pert_sln.routes[r].size() - 1;
+        while (i < r1_size)
+        {
+            r3_size = pert_sln.routes[r - 1].size() - 1;
+            while (k < r3_size)
+            {
+                if (rand() % pert_power == 1)
+                {
+                    Solution tmp_sol(pert_sln);
+                    std::vector<size_t> new_route_r1 = tmp_sol.routes[r];
+                    std::vector<size_t> new_route_r2 = tmp_sol.routes[r - 1];
+
+                    new_route_r2.insert(new_route_r2.begin() + k, new_route_r1[i]);
+                    new_route_r1.erase(std::remove(new_route_r1.begin(),
+                                                   new_route_r1.end(), new_route_r1[i]),
+                                       new_route_r1.end());
+
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_route_r1);
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r - 1], new_route_r2);
+
+                    if (AccuracyCheck(prb, tmp_sol))
+                    {
+                        pert_sln = tmp_sol;
+
+                        --r1_size;
+                        if (i == r1_size)
+                            break;
+                        ++r3_size;
+                    }
+                }
+                ++k;
+            }
+
+            if (i == r1_size)
+                break;
+
+            r2_size = pert_sln.routes[r + 1].size() - 1;
+            while (j < r2_size)
+            {
+                if (rand() % pert_power == 1)
+                {
+                    Solution tmp_sol(pert_sln);
+                    std::vector<size_t> new_route_r1 = tmp_sol.routes[r];
+                    std::vector<size_t> new_route_r2 = tmp_sol.routes[r + 1];
+
+                    new_route_r2.insert(new_route_r2.begin() + j, new_route_r1[i]);
+                    new_route_r1.erase(std::remove(new_route_r1.begin(),
+                                                   new_route_r1.end(), new_route_r1[i]),
+                                       new_route_r1.end());
+
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_route_r1);
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r + 1], new_route_r2);
+
+                    if (AccuracyCheck(prb, tmp_sol))
+                    {
+                        pert_sln = tmp_sol;
+                        --r1_size;
+                        if (i == r1_size)
+                            break;
+                        ++r2_size;
+                    }
+                }
+                ++j;
+            }
+            ++i;
+            j = 1;
+            k = 1;
+        }
+        i = 1;
+    }
+
+    // exchange
+    r1_size = 0;
+    r2_size = 0;
+
+    i = j = 1;
+
+    for (int r = 0; r < sln.routes.size() - 1; ++r)
+    {
+        r1_size = pert_sln.routes[r].size() - 1;
+
+        while (i < r1_size)
+        {
+            r2_size = pert_sln.routes[r + 1].size() - 1;
+
+            while (j < r2_size)
+            {
+                if (rand() % pert_power == 1)
+                {
+                    Solution tmp_sol(pert_sln);
+                    int cust_r1 = tmp_sol.routes[r][i];
+                    int cust_r2 = tmp_sol.routes[r + 1][j];
+
+                    std::vector<size_t> new_r1 = tmp_sol.routes[r];
+                    std::vector<size_t> new_r2 = tmp_sol.routes[r + 1];
+
+                    std::replace(new_r1.begin(), new_r1.end(), cust_r1, cust_r2);
+                    std::replace(new_r2.begin(), new_r2.end(), cust_r2, cust_r1);
+
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r], new_r1);
+                    std::replace(tmp_sol.routes.begin(), tmp_sol.routes.end(), tmp_sol.routes[r + 1], new_r2);
+
+                    if (AccuracyCheck(prb, tmp_sol) && (CalcObjective(prb, tmp_sol) < CalcObjective(prb, pert_sln)))
+                    {
+                        pert_sln = tmp_sol;
+                    }
+                }
+                ++j;
+            }
+            ++i;
+            j = 1;
+        }
+        i = 1;
+    }
+
+    return pert_sln;
+}
+
+Solution IteratedLocalSearch(const Problem &prb, const Solution &sln)
+{
+    Solution curr_best_sol = LocalSearch(prb, sln);
+    Solution changed_sol = curr_best_sol;
+    Solution improved_changed_sol = curr_best_sol;
+
+    const int pert_power = 3;
+    int n_iter = 1000 / prb.demand.size();
+
+    Solution best_sol = curr_best_sol;
+    for (int i = 0; i < n_iter; ++i)
+    {
+        while (true)
+        {
+            changed_sol = Perturbation(prb, curr_best_sol, pert_power);
+
+            improved_changed_sol = LocalSearch(prb, changed_sol);
+            if (CalcObjective(prb, improved_changed_sol) - CalcObjective(prb, curr_best_sol) < 0)
+            {
+                //std::cout << "!!ils got improvement!!" << std::endl;
+                curr_best_sol = improved_changed_sol;
+            }
+            else
+                break;
+        }
+
+        if (CalcObjective(prb, curr_best_sol) - CalcObjective(prb, best_sol) < 0)
+        {
+            best_sol = curr_best_sol;
+        }
+
+        // reset local min for the next iter
+        curr_best_sol = LocalSearch(prb, sln);
+    }
+
+    Solution prev_sln = best_sol;
+    best_sol = LocalSearch(prb, best_sol);
+
+    while (AccuracyCheck(prb, best_sol) && CalcObjective(prb, best_sol) - CalcObjective(prb, prev_sln) < 0)
+    {
+        prev_sln = best_sol;
+        best_sol = LocalSearch(prb, best_sol);
+    }
+
+    return best_sol;
 }
 
 int main()
@@ -619,7 +833,25 @@ int main()
         else
             std::cout << "Guided Local Search IMPROVED OBJECTIVE = " << CalcObjective(prb, gls_sln) << std::endl;
 
-        auto best_sln = CalcObjective(prb, gls_sln) < CalcObjective(prb, improved_sln) ? gls_sln : improved_sln;
+        // run iterated local search
+        Solution ils_sln = IteratedLocalSearch(prb, sln);
+        if (!AccuracyCheck(prb, ils_sln))
+            std::cout << "!!!DID NOT PASS ACCURACY TEST!!!" << std::endl;
+        else
+            std::cout << "Iterated Local Search IMPROVED OBJECTIVE = " << CalcObjective(prb, ils_sln) << std::endl;
+
+        auto best_obj = std::min({CalcObjective(prb, gls_sln),
+                                  CalcObjective(prb, ils_sln),
+                                  CalcObjective(prb, improved_sln)});
+
+        Solution best_sln = sln;
+        if (best_obj == CalcObjective(prb, gls_sln))
+            best_sln = gls_sln;
+        if (best_obj == CalcObjective(prb, ils_sln))
+            best_sln = ils_sln;
+        if (best_obj == CalcObjective(prb, improved_sln))
+            best_sln = improved_sln;
+
         if (AccuracyCheck(prb, best_sln))
         {
             // FIXME: DELETE THIS
